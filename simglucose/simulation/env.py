@@ -79,6 +79,7 @@ class T1DSimEnv(object):
         lbgi_list = []
         hbgi_list = []
         risk_list = []
+        datetime_list = []
 
         for i in range(int(self.interaction_step)):
             # TODO: change logic to use interaction_step
@@ -96,6 +97,7 @@ class T1DSimEnv(object):
             insulin_list.append(tmp_insulin)
             bg_list.append(tmp_BG)
             cgm_list.append(tmp_CGM)
+            datetime_list.append(self.time)
 
         # Compute risk index
         horizon = 1
@@ -147,6 +149,7 @@ class T1DSimEnv(object):
             lbgi_list=lbgi_list,
             hbgi_list=hbgi_list,
             risk_list=risk_list,
+            datetime_list=datetime_list,
         )
 
     def _reset(self):
@@ -196,6 +199,7 @@ class T1DSimEnv(object):
             lbgi_list=[],
             hbgi_list=[],
             risk_list=[],
+            datetime_list=[],
         )
 
     def render(self, close=False):
