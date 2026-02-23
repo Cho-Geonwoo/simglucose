@@ -24,7 +24,7 @@ class T1DSimEnv(gym.Env):
     INSULIN_PUMP_HARDWARE = 'Insulet'
     
     # Harry: added schedule variable
-    def __init__(self, patient_name=None, custom_scenario=None, reward_fun=None, seed=None, schedule=None):
+    def __init__(self, patient_name=None, custom_scenario=None, reward_fun=None, seed=None, schedule=None, sample_time=1.0, interaction_step=3.0):
         '''
         patient_name must be 'adolescent#001' to 'adolescent#010',
         or 'adult#001' to 'adult#010', or 'child#001' to 'child#010'
@@ -37,7 +37,10 @@ class T1DSimEnv(gym.Env):
         self.reward_fun = reward_fun
         
         self.schedule = schedule
-        
+        self.sample_time = sample_time # simulator sample time in minutes, default is 1 minute
+        self.interaction_step = interaction_step # determine the interval of agent's interaction by step, default is 3 steps
+        self.noise_sample_time = self.sample_time * self.interaction_step # the time interval for noise sampling, default is 3 minutes
+
         self.np_random, _ = seeding.np_random(seed=seed)
         self.env, _, _, _ = self._create_env_from_random_state(custom_scenario)
 
@@ -69,13 +72,13 @@ class T1DSimEnv(gym.Env):
 
         hour = self.np_random.randint(low=0.0, high=24.0)
         start_time = datetime(2018, 1, 1, hour, 0, 0)
-        patient = T1DPatient.withName(self.patient_name, random_init_bg=True, seed=seed4)
-        sensor = CGMSensor.withName(self.SENSOR_HARDWARE, seed=seed2)
-        
+        patient = T1DPatient.withName(self.patient_name, random_init_bg=True, seed=seed4, sample_time=self.sample_time)
+        sensor = CGMSensor.withName(self.SENSOR_HARDWARE, seed=seed2, noise_sample_time=self.noise_sample_time)
+
         scenario = RandomScenario(start_time=start_time, seed=seed3, schedule=self.schedule) if custom_scenario is None else custom_scenario
-        
+
         pump = InsulinPump.withName(self.INSULIN_PUMP_HARDWARE)
-        env = _T1DSimEnv(patient, sensor, pump, scenario)
+        env = _T1DSimEnv(patient, sensor, pump, scenario, interaction_step=self.interaction_step)
         return env, seed2, seed3, seed4
 
     def _render(self, mode='human', close=False):

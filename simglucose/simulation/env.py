@@ -34,18 +34,19 @@ def risk_diff(BG_last_hour):
 
 
 class T1DSimEnv(object):
-    def __init__(self, patient, sensor, pump, scenario):
+    def __init__(self, patient, sensor, pump, scenario, interaction_step=3.0):
         self.patient = patient
         self.sensor = sensor
         self.pump = pump
         self.scenario = scenario
+        self.interaction_step = interaction_step
         self._reset()
 
     @property
     def time(self):
         return self.scenario.start_time + timedelta(minutes=self.patient.t)
 
-    def mini_step(self, action):
+    def mini_step(self, action, update_observation=False):
         # current action
         patient_action = self.scenario.get_action(self.time)
         basal = self.pump.basal(action.basal)
@@ -59,7 +60,7 @@ class T1DSimEnv(object):
 
         # next observation
         BG = self.patient.observation.Gsub
-        CGM = self.sensor.measure(self.patient)
+        CGM = self.sensor.measure(self.patient, update_observation=update_observation)
 
         return CHO, insulin, BG, CGM
 
@@ -67,60 +68,86 @@ class T1DSimEnv(object):
         '''
         action is a namedtuple with keys: basal, bolus
         '''
-        CHO = 0.0
-        insulin = 0.0
-        BG = 0.0
-        CGM = 0.0
+        average_cho = 0.0
+        average_insulin = 0.0
+        average_bg = 0.0
+        average_cgm = 0.0
+        cho_list = []
+        insulin_list = []
+        bg_list = []
+        cgm_list = []
+        lbgi_list = []
+        hbgi_list = []
+        risk_list = []
 
-        for _ in range(int(self.sample_time)):
-            # Compute moving average as the sample measurements
-            tmp_CHO, tmp_insulin, tmp_BG, tmp_CGM = self.mini_step(action)
-            CHO += tmp_CHO / self.sample_time
-            insulin += tmp_insulin / self.sample_time
-            BG += tmp_BG / self.sample_time
-            CGM += tmp_CGM / self.sample_time
+        for i in range(int(self.interaction_step)):
+            # TODO: change logic to use interaction_step
+            update_observation = False
+            if i == int(self.interaction_step) - 1:
+                update_observation = True
+            tmp_CHO, tmp_insulin, tmp_BG, tmp_CGM = self.mini_step(action, update_observation)
+            average_cho += tmp_CHO / self.interaction_step
+            average_insulin += tmp_insulin / self.interaction_step
+            average_bg += tmp_BG / self.interaction_step
+            average_cgm += tmp_CGM / self.interaction_step
+            cho_list.append(tmp_CHO)
+            insulin_list.append(tmp_insulin)
+            bg_list.append(tmp_BG)
+            cgm_list.append(tmp_CGM)
 
         # Compute risk index
         horizon = 1
-        LBGI, HBGI, risk = risk_index([BG], horizon)
+        LBGI, HBGI, risk = risk_index([average_bg], horizon)
+
+        for i in range(int(self.interaction_step)):
+            curr_lbgi, curr_hbgi, curr_risk = risk_index([bg_list[i]], horizon)
+            lbgi_list.append(curr_lbgi)
+            hbgi_list.append(curr_hbgi)
+            risk_list.append(curr_risk)
 
         # Record current action
-        self.CHO_hist.append(CHO)
-        self.insulin_hist.append(insulin)
+        self.CHO_hist.append(average_cho)
+        self.insulin_hist.append(average_insulin)
 
         # Record next observation
         self.time_hist.append(self.time)
-        self.BG_hist.append(BG)
-        self.CGM_hist.append(CGM)
+        self.BG_hist.append(average_bg)
+        self.CGM_hist.append(average_cgm)
         self.risk_hist.append(risk)
         self.LBGI_hist.append(LBGI)
         self.HBGI_hist.append(HBGI)
 
-        # Compute reward, and decide whether game is over
-        window_size = int(60 / self.sample_time)
-        BG_last_hour = self.CGM_hist[-window_size:]
+        BG_last_hour = self.CGM_hist[-2:]
         reward = reward_fun(BG_last_hour)
-        
+
         # Harry: changed this to be similar to: https://arxiv.org/pdf/2010.06266.pdf
-        # done = BG < 70 or BG > 350
-        done = BG < 10 or BG > 1000
-        obs = Observation(CGM=CGM)
+        # done = average_bg < 70 or average_bg > 350
+        done = average_bg < 10 or average_bg > 1000
+        obs = Observation(CGM=average_cgm)
 
         return Step(observation=obs,
                     reward=reward,
                     done=done,
                     sample_time=self.sample_time,
                     patient_name=self.patient.name,
-                    meal=CHO,
+                    meal=average_cho,
                     patient_state=self.patient.state,
                     time=self.time,
-                    bg=BG,
+                    bg=average_bg,
                     lbgi=LBGI,
                     hbgi=HBGI,
-                    risk=risk)
+                    risk=risk,
+                    cho_list=cho_list,
+                    insulin_list=insulin_list,
+                    bg_list=bg_list,
+                    cgm_list=cgm_list,
+                    lbgi_list=lbgi_list,
+                    hbgi_list=hbgi_list,
+                    risk_list=risk_list
+                    )
 
     def _reset(self):
-        self.sample_time = self.sensor.sample_time
+        self.sample_time = self.patient.sample_time
         self.viewer = None
 
         BG = self.patient.observation.Gsub
@@ -157,7 +184,15 @@ class T1DSimEnv(object):
                     bg=self.BG_hist[0],
                     lbgi=self.LBGI_hist[0],
                     hbgi=self.HBGI_hist[0],
-                    risk=self.risk_hist[0])
+                    risk=self.risk_hist[0],
+                    cho_list=[],
+                    insulin_list=[],
+                    bg_list=[],
+                    cgm_list=[],
+                    lbgi_list=[],
+                    hbgi_list=[],
+                    risk_list=[]
+                    )
 
     def render(self, close=False):
         if close:

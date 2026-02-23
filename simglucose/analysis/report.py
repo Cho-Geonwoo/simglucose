@@ -26,8 +26,8 @@ def ensemble_BG(BG, ax=None, plot_var=False, nstd=3):
             t, up_env, down_env, alpha=0.5, label='+/- {0}*std'.format(nstd))
     for p in BG:
         ax.plot_date(
-            t, BG[p], '-', color='grey', alpha=0.5, lw=0.5, label='_nolegend_')
-    ax.plot(t, mean_curve, lw=2, label='Mean Curve')
+            t.to_numpy(), BG[p].to_numpy(), '-', color='grey', alpha=0.5, lw=0.5, label='_nolegend_')
+    ax.plot(t.to_numpy(), mean_curve.to_numpy(), lw=2, label='Mean Curve')
     ax.xaxis.set_minor_locator(mdates.HourLocator(interval=3))
     ax.xaxis.set_minor_formatter(mdates.DateFormatter('%H:%M\n'))
     ax.xaxis.set_major_locator(mdates.DayLocator())
@@ -56,7 +56,7 @@ def ensemblePlot(df):
     ax2 = ensemble_BG(df_CGM, ax=ax2, plot_var=True, nstd=1)
     # t = df_CHO.index.to_pydatetime()
     t = pd.to_datetime(df_CHO.index)
-    ax3.plot(t, df_CHO)
+    ax3.plot(t.to_numpy(), df_CHO.to_numpy())
 
     ax1.tick_params(labelbottom=False)
     ax2.tick_params(labelbottom=False)
@@ -98,8 +98,9 @@ def risk_index_trace(df_BG, visualize=False):
     fBG = [
         np.mean(1.509 * (np.log(BG[BG > 0])**1.084 - 5.381)) for BG in chunk_BG
     ]
+    fBG_df = pd.DataFrame(fBG, columns=["fBG"]).transpose()
 
-    fBG_df = pd.concat(fBG, axis=1).transpose()
+    # fBG_df = pd.concat(fBG_df, axis=1).transpose()
 
     LBGI = 10 * (fBG_df * (fBG_df < 0))**2
     HBGI = 10 * (fBG_df * (fBG_df > 0))**2

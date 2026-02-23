@@ -24,7 +24,9 @@ class T1DPatient(Patient):
                  init_state=None,
                  random_init_bg=False,
                  seed=None,
-                 t0=0):
+                 t0=0,
+                 sample_time=1,
+                 ):
         '''
         T1DPatient constructor.
         Inputs:
@@ -39,6 +41,7 @@ class T1DPatient(Patient):
         self.random_init_bg = random_init_bg
         self._seed = seed
         self.t0 = t0
+        self.SAMPLE_TIME = sample_time
         self.reset()
 
     @classmethod
@@ -228,7 +231,7 @@ class T1DPatient(Patient):
         '''
         self.planned_meal += meal
         if self.planned_meal > 0:
-            to_eat = min(self.EAT_RATE, self.planned_meal)
+            to_eat = min(self.EAT_RATE * self.sample_time, self.planned_meal)
             self.planned_meal -= to_eat
             self.planned_meal = max(0, self.planned_meal)
         else:

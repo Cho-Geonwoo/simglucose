@@ -16,12 +16,13 @@ class CGMNoise(object):
     PRECOMPUTE = 10  # length of pre-compute noise sequence
     MDL_SAMPLE_TIME = 15
 
-    def __init__(self, params, n=np.inf, seed=None):
+    def __init__(self, params, n=np.inf, noise_sample_time=3.0, seed=None):
         self._params = params
         self.seed = seed
         # self._noise15_gen = self._noise15_generator()
         self._noise15_gen = noise15_iter(params, seed=seed)
         self._noise_init = next(self._noise15_gen)
+        self.noise_sample_time = noise_sample_time
 
         self.n = n
         self.count = 0
@@ -39,8 +40,8 @@ class CGMNoise(object):
         t15 = np.array(range(0, len(noise15))) * self.MDL_SAMPLE_TIME
 
         nsample = int(math.floor(
-            self.PRECOMPUTE * self.MDL_SAMPLE_TIME / self._params["sample_time"])) + 1
-        t = np.array(range(0, nsample)) * self._params["sample_time"]
+            self.PRECOMPUTE * self.MDL_SAMPLE_TIME / self.noise_sample_time)) + 1
+        t = np.array(range(0, nsample)) * self.noise_sample_time
 
         interp_f = interp1d(t15, noise15, kind='cubic')
         noise = interp_f(t)
