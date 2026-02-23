@@ -7,18 +7,18 @@ from rllab.envs.gym_env import GymEnv
 from gym.envs.registration import register
 
 register(
-    id='simglucose-adolescent2-v0',
-    entry_point='simglucose.envs:T1DSimEnv',
-    kwargs={'patient_name': 'adolescent#002'}
+    id="simglucose-adolescent2-v0",
+    entry_point="simglucose.envs:T1DSimEnv",
+    kwargs={"patient_name": "adolescent#002"},
 )
 
-env = GymEnv('simglucose-adolescent2-v0')
+env = GymEnv("simglucose-adolescent2-v0")
 env = normalize(env)
 
 policy = DeterministicMLPPolicy(
     env_spec=env.spec,
     # The neural network policy should have two hidden layers, each with 32 hidden units.
-    hidden_sizes=(32, 32)
+    hidden_sizes=(32, 32),
 )
 
 es = OUStrategy(env_spec=env.spec)
@@ -38,6 +38,6 @@ algo = DDPG(
     discount=0.99,
     scale_reward=0.01,
     qf_learning_rate=1e-3,
-    policy_learning_rate=1e-4
+    policy_learning_rate=1e-4,
 )
 algo.train()

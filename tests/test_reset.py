@@ -3,15 +3,15 @@ import unittest
 from gym.envs.registration import register
 
 register(
-        id='simglucose-adult2-v0',
-        entry_point='simglucose.envs:T1DSimEnv',
-        kwargs={'patient_name': 'adult#002'}
-        )
+    id="simglucose-adult2-v0",
+    entry_point="simglucose.envs:T1DSimEnv",
+    kwargs={"patient_name": "adult#002"},
+)
 
 
 class TestReset(unittest.TestCase):
     def test_reset_changes_observation_when_seed_is_fixed(self):
-        env = gym.make('simglucose-adult2-v0')
+        env = gym.make("simglucose-adult2-v0")
 
         env.seed(0)
         observation0 = env.reset()
@@ -27,7 +27,7 @@ class TestReset(unittest.TestCase):
         self.assertNotEqual(scenario0, scenario1)
 
     def test_reset_change_is_deterministic_when_seed_is_fixed(self):
-        env = gym.make('simglucose-adult2-v0')
+        env = gym.make("simglucose-adult2-v0")
 
         env.seed(0)
         observation0 = env.reset()
@@ -37,7 +37,7 @@ class TestReset(unittest.TestCase):
         observation1 = env.reset()
         start_time1 = env.env.scenario.start_time
         scenario1 = env.env.scenario.scenario
-        
+
         env.seed(0)
         observation2 = env.reset()
         start_time2 = env.env.scenario.start_time
@@ -57,7 +57,7 @@ class TestReset(unittest.TestCase):
         self.assertEqual(scenario1, scenario3)
 
     def test_reset_change_is_random_when_seed_is_different(self):
-        env = gym.make('simglucose-adult2-v0')
+        env = gym.make("simglucose-adult2-v0")
 
         env.seed(0)
         observation0 = env.reset()
@@ -67,7 +67,7 @@ class TestReset(unittest.TestCase):
         observation1 = env.reset()
         start_time1 = env.env.scenario.start_time
         scenario1 = env.env.scenario.scenario
-        
+
         env.seed(1)
         observation2 = env.reset()
         start_time2 = env.env.scenario.start_time
@@ -86,5 +86,6 @@ class TestReset(unittest.TestCase):
         self.assertNotEqual(scenario0, scenario2)
         self.assertNotEqual(scenario1, scenario3)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

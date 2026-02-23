@@ -20,7 +20,7 @@ except ImportError:
         return _Step(observation, reward, done, kwargs)
 
 
-Observation = namedtuple('Observation', ['CGM'])
+Observation = namedtuple("Observation", ["CGM"])
 logger = logging.getLogger(__name__)
 
 
@@ -65,9 +65,9 @@ class T1DSimEnv(object):
         return CHO, insulin, BG, CGM
 
     def step(self, action, reward_fun=risk_diff):
-        '''
+        """
         action is a namedtuple with keys: basal, bolus
-        '''
+        """
         average_cho = 0.0
         average_insulin = 0.0
         average_bg = 0.0
@@ -85,7 +85,9 @@ class T1DSimEnv(object):
             update_observation = False
             if i == int(self.interaction_step) - 1:
                 update_observation = True
-            tmp_CHO, tmp_insulin, tmp_BG, tmp_CGM = self.mini_step(action, update_observation)
+            tmp_CHO, tmp_insulin, tmp_BG, tmp_CGM = self.mini_step(
+                action, update_observation
+            )
             average_cho += tmp_CHO / self.interaction_step
             average_insulin += tmp_insulin / self.interaction_step
             average_bg += tmp_BG / self.interaction_step
@@ -125,26 +127,27 @@ class T1DSimEnv(object):
         done = average_bg < 10 or average_bg > 1000
         obs = Observation(CGM=average_cgm)
 
-        return Step(observation=obs,
-                    reward=reward,
-                    done=done,
-                    sample_time=self.sample_time,
-                    patient_name=self.patient.name,
-                    meal=average_cho,
-                    patient_state=self.patient.state,
-                    time=self.time,
-                    bg=average_bg,
-                    lbgi=LBGI,
-                    hbgi=HBGI,
-                    risk=risk,
-                    cho_list=cho_list,
-                    insulin_list=insulin_list,
-                    bg_list=bg_list,
-                    cgm_list=cgm_list,
-                    lbgi_list=lbgi_list,
-                    hbgi_list=hbgi_list,
-                    risk_list=risk_list
-                    )
+        return Step(
+            observation=obs,
+            reward=reward,
+            done=done,
+            sample_time=self.sample_time,
+            patient_name=self.patient.name,
+            meal=average_cho,
+            patient_state=self.patient.state,
+            time=self.time,
+            bg=average_bg,
+            lbgi=LBGI,
+            hbgi=HBGI,
+            risk=risk,
+            cho_list=cho_list,
+            insulin_list=insulin_list,
+            bg_list=bg_list,
+            cgm_list=cgm_list,
+            lbgi_list=lbgi_list,
+            hbgi_list=hbgi_list,
+            risk_list=risk_list,
+        )
 
     def _reset(self):
         self.sample_time = self.patient.sample_time
@@ -162,37 +165,38 @@ class T1DSimEnv(object):
         self.HBGI_hist = [HBGI]
         self.CHO_hist = []
         self.insulin_hist = []
-    
+
     def reset(self):
         self.patient.reset()
         self.sensor.reset()
         self.pump.reset()
         self.scenario.reset()
-        
+
         self._reset()
-        
+
         CGM = self.sensor.measure(self.patient)
         obs = Observation(CGM=CGM)
-        return Step(observation=obs,
-                    reward=0,
-                    done=False,
-                    sample_time=self.sample_time,
-                    patient_name=self.patient.name,
-                    meal=0,
-                    patient_state=self.patient.state,
-                    time=self.time,
-                    bg=self.BG_hist[0],
-                    lbgi=self.LBGI_hist[0],
-                    hbgi=self.HBGI_hist[0],
-                    risk=self.risk_hist[0],
-                    cho_list=[],
-                    insulin_list=[],
-                    bg_list=[],
-                    cgm_list=[],
-                    lbgi_list=[],
-                    hbgi_list=[],
-                    risk_list=[]
-                    )
+        return Step(
+            observation=obs,
+            reward=0,
+            done=False,
+            sample_time=self.sample_time,
+            patient_name=self.patient.name,
+            meal=0,
+            patient_state=self.patient.state,
+            time=self.time,
+            bg=self.BG_hist[0],
+            lbgi=self.LBGI_hist[0],
+            hbgi=self.HBGI_hist[0],
+            risk=self.risk_hist[0],
+            cho_list=[],
+            insulin_list=[],
+            bg_list=[],
+            cgm_list=[],
+            lbgi_list=[],
+            hbgi_list=[],
+            risk_list=[],
+        )
 
     def render(self, close=False):
         if close:
@@ -208,13 +212,13 @@ class T1DSimEnv(object):
 
     def show_history(self):
         df = pd.DataFrame()
-        df['Time'] = pd.Series(self.time_hist)
-        df['BG'] = pd.Series(self.BG_hist)
-        df['CGM'] = pd.Series(self.CGM_hist)
-        df['CHO'] = pd.Series(self.CHO_hist)
-        df['insulin'] = pd.Series(self.insulin_hist)
-        df['LBGI'] = pd.Series(self.LBGI_hist)
-        df['HBGI'] = pd.Series(self.HBGI_hist)
-        df['Risk'] = pd.Series(self.risk_hist)
-        df = df.set_index('Time')
+        df["Time"] = pd.Series(self.time_hist)
+        df["BG"] = pd.Series(self.BG_hist)
+        df["CGM"] = pd.Series(self.CGM_hist)
+        df["CHO"] = pd.Series(self.CHO_hist)
+        df["insulin"] = pd.Series(self.insulin_hist)
+        df["LBGI"] = pd.Series(self.LBGI_hist)
+        df["HBGI"] = pd.Series(self.HBGI_hist)
+        df["Risk"] = pd.Series(self.risk_hist)
+        df = df.set_index("Time")
         return df

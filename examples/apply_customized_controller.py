@@ -8,7 +8,7 @@ class MyController(Controller):
         self.state = init_state
 
     def policy(self, observation, reward, done, **info):
-        '''
+        """
         Every controller must have this implementation!
         ----
         Inputs:
@@ -24,15 +24,15 @@ class MyController(Controller):
         Output:
         action - a namedtuple defined at the beginning of this file. The
                  controller action contains two entries: basal, bolus
-        '''
+        """
         self.state = observation
         action = Action(basal=0, bolus=0)
         return action
 
     def reset(self):
-        '''
+        """
         Reset the controller state to inital state, must be implemented
-        '''
+        """
         self.state = self.init_state
 
 

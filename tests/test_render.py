@@ -6,7 +6,7 @@ import logging
 import os
 
 logger = logging.getLogger(__name__)
-TESTDATA_FILENAME = os.path.join(os.path.dirname(__file__), 'sim_results.csv')
+TESTDATA_FILENAME = os.path.join(os.path.dirname(__file__), "sim_results.csv")
 
 
 class TestRendering(unittest.TestCase):
@@ -16,12 +16,12 @@ class TestRendering(unittest.TestCase):
 
     def test_rendering(self):
         start_time = datetime(2018, 1, 1, 0, 0, 0)
-        viewer = Viewer(start_time, 'adolescent#001')
+        viewer = Viewer(start_time, "adolescent#001")
         for i in range(len(self.df)):
-            df_tmp = self.df.iloc[0:(i + 1), :]
+            df_tmp = self.df.iloc[0 : (i + 1), :]
             viewer.render(df_tmp)
         viewer.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

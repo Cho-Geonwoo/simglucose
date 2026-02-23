@@ -6,7 +6,8 @@ import pkg_resources
 
 logger = logging.getLogger(__name__)
 SENSOR_PARA_FILE = pkg_resources.resource_filename(
-    'simglucose', 'params/sensor_params.csv')
+    "simglucose", "params/sensor_params.csv"
+)
 
 
 class CGMSensor(object):
@@ -42,13 +43,17 @@ class CGMSensor(object):
     @seed.setter
     def seed(self, seed):
         self._seed = seed
-        self._noise_generator = CGMNoise(self._params, noise_sample_time=self.noise_sample_time, seed=seed)
+        self._noise_generator = CGMNoise(
+            self._params, noise_sample_time=self.noise_sample_time, seed=seed
+        )
 
     def reset(self):
-        logger.debug('Resetting CGM sensor ...')
-        self._noise_generator = CGMNoise(self._params, noise_sample_time=self.noise_sample_time, seed=self.seed)
+        logger.debug("Resetting CGM sensor ...")
+        self._noise_generator = CGMNoise(
+            self._params, noise_sample_time=self.noise_sample_time, seed=self.seed
+        )
         self._last_CGM = 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass

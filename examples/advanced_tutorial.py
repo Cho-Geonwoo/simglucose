@@ -15,12 +15,12 @@ start_time = datetime.combine(now.date(), datetime.min.time())
 
 # --------- Create Random Scenario --------------
 # Specify results saving path
-path = './results'
+path = "./results"
 
 # Create a simulation environment
-patient = T1DPatient.withName('adolescent#001')
-sensor = CGMSensor.withName('Dexcom', seed=1)
-pump = InsulinPump.withName('Insulet')
+patient = T1DPatient.withName("adolescent#001")
+sensor = CGMSensor.withName("Dexcom", seed=1)
+pump = InsulinPump.withName("Insulet")
 scenario = RandomScenario(start_time=start_time, seed=1)
 env = T1DSimEnv(patient, sensor, pump, scenario)
 
@@ -34,9 +34,9 @@ print(results1)
 
 # --------- Create Custom Scenario --------------
 # Create a simulation environment
-patient = T1DPatient.withName('adolescent#001')
-sensor = CGMSensor.withName('Dexcom', seed=1)
-pump = InsulinPump.withName('Insulet')
+patient = T1DPatient.withName("adolescent#001")
+sensor = CGMSensor.withName("Dexcom", seed=1)
+pump = InsulinPump.withName("Insulet")
 # custom scenario is a list of tuples (time, meal_size)
 scen = [(7, 45), (12, 70), (16, 15), (18, 80), (23, 10)]
 scenario = CustomScenario(start_time=start_time, scenario=scen)

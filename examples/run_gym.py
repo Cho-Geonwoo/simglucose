@@ -5,17 +5,18 @@ import gym
 # patient_name must be 'adolescent#001' to 'adolescent#010',
 # or 'adult#001' to 'adult#010', or 'child#001' to 'child#010'
 from gym.envs.registration import register
+
 register(
-    id='simglucose-adolescent2-v0',
-    entry_point='simglucose.envs:T1DSimEnv',
-    kwargs={'patient_name': 'adolescent#002'}
+    id="simglucose-adolescent2-v0",
+    entry_point="simglucose.envs:T1DSimEnv",
+    kwargs={"patient_name": "adolescent#002"},
 )
 
-env = gym.make('simglucose-adolescent2-v0')
+env = gym.make("simglucose-adolescent2-v0")
 
 observation = env.reset()
 for t in range(100):
-    env.render(mode='human')
+    env.render(mode="human")
     print(observation)
     # Action in the gym environment is a scalar
     # representing the basal insulin, which differs from
