@@ -29,7 +29,14 @@ class T1DSimEnv(gym.Env):
     INSULIN_PUMP_HARDWARE = "Insulet"
 
     def __init__(
-        self, patient_name=None, custom_scenario=None, reward_fun=None, seed=None
+        self,
+        patient_name=None,
+        custom_scenario=None,
+        reward_fun=None,
+        seed=None,
+        sample_time=1.0,
+        interaction_step=3.0,
+        use_noise=False,
     ):
         """
         patient_name must be 'adolescent#001' to 'adolescent#010',
@@ -42,8 +49,18 @@ class T1DSimEnv(gym.Env):
 
         self.patient_name = patient_name
         self.reward_fun = reward_fun
+
+        self.sample_time = (
+            sample_time  # simulator sample time in minutes, default is 1 minute
+        )
+        self.interaction_step = interaction_step  # determine the interval of agent's interaction by step, default is 3 steps
+        self.noise_sample_time = (
+            self.sample_time * self.interaction_step
+        )  # the time interval for noise sampling, default is 3 minutes
+
         self.np_random, _ = seeding.np_random(seed=seed)
         self.custom_scenario = custom_scenario
+        self.use_noise = use_noise
         self.env, _, _, _ = self._create_env()
 
     def _step(self, action: float):
@@ -79,10 +96,18 @@ class T1DSimEnv(gym.Env):
 
         if isinstance(self.patient_name, list):
             patient_name = self.np_random.choice(self.patient_name)
-            patient = T1DPatient.withName(patient_name, random_init_bg=True, seed=seed4)
+            patient = T1DPatient.withName(
+                patient_name,
+                random_init_bg=True,
+                seed=seed4,
+                sample_time=self.sample_time,
+            )
         else:
             patient = T1DPatient.withName(
-                self.patient_name, random_init_bg=True, seed=seed4
+                self.patient_name,
+                random_init_bg=True,
+                seed=seed4,
+                sample_time=self.sample_time,
             )
 
         if isinstance(self.custom_scenario, list):
@@ -94,9 +119,13 @@ class T1DSimEnv(gym.Env):
                 else self.custom_scenario
             )
 
-        sensor = CGMSensor.withName(self.SENSOR_HARDWARE, seed=seed2)
+        sensor = CGMSensor.withName(
+            self.SENSOR_HARDWARE, seed=seed2, noise_sample_time=self.noise_sample_time, use_noise=self.use_noise,
+        )
         pump = InsulinPump.withName(self.INSULIN_PUMP_HARDWARE)
-        env = _T1DSimEnv(patient, sensor, pump, scenario)
+        env = _T1DSimEnv(
+            patient, sensor, pump, scenario, interaction_step=self.interaction_step
+        )
         return env, seed2, seed3, seed4
 
     def _render(self, mode="human", close=False):
