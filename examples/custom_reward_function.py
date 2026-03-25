@@ -12,20 +12,19 @@ def custom_reward(BG_last_hour):
 
 
 register(
-    id='simglucose-adolescent2-v0',
-    entry_point='simglucose.envs:T1DSimEnv',
-    kwargs={'patient_name': 'adolescent#002',
-            'reward_fun': custom_reward}
+    id="simglucose-adolescent2-v0",
+    entry_point="simglucose.envs:T1DSimEnv",
+    kwargs={"patient_name": "adolescent#002", "reward_fun": custom_reward},
 )
 
-env = gym.make('simglucose-adolescent2-v0')
+env = gym.make("simglucose-adolescent2-v0")
 
 reward = 1
 done = False
 
 observation = env.reset()
 for t in range(200):
-    env.render(mode='human')
+    env.render(mode="human")
     action = env.action_space.sample()
     observation, reward, done, info = env.step(action)
     print(observation)

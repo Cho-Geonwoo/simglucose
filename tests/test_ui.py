@@ -5,21 +5,31 @@ import shutil
 import os
 import pandas as pd
 
-output_folder = os.path.join(os.path.dirname(__file__), 'results')
+output_folder = os.path.join(os.path.dirname(__file__), "results")
 
 
 class testUI(unittest.TestCase):
     def setUp(self):
         pass
 
-    @patch('builtins.input')
+    @patch("builtins.input")
     def test_ui(self, mock_input):
         # animation, parallel, save_path, sim_time, scenario, scenario random
         # seed, start_time, patients, sensor, sensor seed, insulin pump,
         # controller
         mock_input.side_effect = [
-            'n', 'y', output_folder, '24', '1', '2', '6', '1', '1', '1', '2',
-            '1'
+            "n",
+            "y",
+            output_folder,
+            "24",
+            "1",
+            "2",
+            "6",
+            "1",
+            "1",
+            "1",
+            "2",
+            "1",
         ]
         results = simulate()
         self.assertIsInstance(results, pd.DataFrame)
@@ -28,5 +38,5 @@ class testUI(unittest.TestCase):
         shutil.rmtree(output_folder)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
