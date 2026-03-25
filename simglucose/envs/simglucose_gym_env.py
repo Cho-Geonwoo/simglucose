@@ -120,7 +120,10 @@ class T1DSimEnv(gym.Env):
             )
 
         sensor = CGMSensor.withName(
-            self.SENSOR_HARDWARE, seed=seed2, noise_sample_time=self.noise_sample_time, use_noise=self.use_noise,
+            self.SENSOR_HARDWARE,
+            seed=seed2,
+            noise_sample_time=self.noise_sample_time,
+            use_noise=self.use_noise,
         )
         pump = InsulinPump.withName(self.INSULIN_PUMP_HARDWARE)
         env = _T1DSimEnv(

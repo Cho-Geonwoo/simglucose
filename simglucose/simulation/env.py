@@ -86,7 +86,9 @@ class T1DSimEnv(object):
             update_observation = False
             if i == int(self.interaction_step) - 1:
                 update_observation = True
-            tmp_CHO, tmp_insulin, tmp_BG, tmp_CGM = self.mini_step(action, update_observation)
+            tmp_CHO, tmp_insulin, tmp_BG, tmp_CGM = self.mini_step(
+                action, update_observation
+            )
             average_cho += tmp_CHO / self.interaction_step
             average_insulin += tmp_insulin / self.interaction_step
             average_bg += tmp_BG / self.interaction_step
