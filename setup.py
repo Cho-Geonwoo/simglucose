@@ -2,11 +2,11 @@ from setuptools import setup
 
 setup(
     name="simglucose",
-    version="0.2.11",
+    version="0.3.1",
     description="A Type-1 Diabetes Simulator as a Reinforcement Learning Environment in OpenAI gym or rllab (python implementation of UVa/Padova Simulator)",
-    url="https://github.com/jxx123/simglucose",
-    author="Jinyu Xie",
-    author_email="xjygr08@gmail.com",
+    url="https://github.com/Cho-Geonwoo/simglucose",
+    author="Geonwoo Cho",
+    author_email="geonwoo@umich.edu",
     license="MIT",
     packages=["simglucose"],
     install_requires=[
