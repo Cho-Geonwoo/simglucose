@@ -68,7 +68,7 @@ class T1DSimEnv(object):
         """
         action is a namedtuple with keys: basal, bolus
         """
-        average_cho = 0.0
+        total_cho = 0.0
         average_insulin = 0.0
         average_bg = 0.0
         average_cgm = 0.0
@@ -89,7 +89,7 @@ class T1DSimEnv(object):
             tmp_CHO, tmp_insulin, tmp_BG, tmp_CGM = self.mini_step(
                 action, update_observation
             )
-            average_cho += tmp_CHO / self.interaction_step
+            total_cho += tmp_CHO
             average_insulin += tmp_insulin / self.interaction_step
             average_bg += tmp_BG / self.interaction_step
             average_cgm += tmp_CGM / self.interaction_step
@@ -110,7 +110,7 @@ class T1DSimEnv(object):
             risk_list.append(curr_risk)
 
         # Record current action
-        self.CHO_hist.append(average_cho)
+        self.CHO_hist.append(total_cho)
         self.insulin_hist.append(average_insulin)
 
         # Record next observation
@@ -133,7 +133,7 @@ class T1DSimEnv(object):
             done=done,
             sample_time=self.sample_time,
             patient_name=self.patient.name,
-            meal=average_cho,
+            meal=total_cho,
             patient_state=self.patient.state,
             time=self.time,
             bg=average_bg,
