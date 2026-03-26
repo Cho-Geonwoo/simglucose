@@ -124,7 +124,7 @@ class T1DSimEnv(object):
         # Compute reward, and decide whether game is over
         BG_last_hour = self.CGM_hist[-2:]
         reward = reward_fun(BG_last_hour)
-        done = any(average_bg < 10 or average_bg > 600 for bg in bg_list)
+        done = any(bg < 10 or bg > 600 for bg in bg_list)
         obs = Observation(CGM=self.CGM_hist[-1])
 
         return Step(

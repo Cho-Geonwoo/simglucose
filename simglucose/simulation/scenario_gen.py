@@ -10,22 +10,30 @@ logger = logging.getLogger(__name__)
 class RandomScenario(Scenario):
     def __init__(self, start_time, seed=None):
         Scenario.__init__(self, start_time=start_time)
+        self._last_scenario_date = None
+        self._consumed_meal_times = set()
         self.seed = seed
 
     def get_action(self, t):
         # t must be datetime.datetime object
         delta_t = t - datetime.combine(t.date(), datetime.min.time())
         t_sec = delta_t.total_seconds()
+        t_min = int(np.floor(t_sec / 60.0))
 
-        if t_sec < 1:
+        # Create one scenario per calendar day and reset meal-consumption marks.
+        if self._last_scenario_date != t.date():
             logger.info("Creating new one day scenario ...")
             self.scenario = self.create_scenario()
+            self._last_scenario_date = t.date()
+            self._consumed_meal_times = set()
 
-        t_min = np.floor(t_sec / 60.0)
-
-        if t_min in self.scenario["meal"]["time"]:
+        if (
+            t_min in self.scenario["meal"]["time"]
+            and t_min not in self._consumed_meal_times
+        ):
             logger.info("Time for meal!")
             idx = self.scenario["meal"]["time"].index(t_min)
+            self._consumed_meal_times.add(t_min)
             return Action(meal=self.scenario["meal"]["amount"][idx])
         else:
             return Action(meal=0)
@@ -65,6 +73,8 @@ class RandomScenario(Scenario):
 
     def reset(self):
         self.random_gen = np.random.RandomState(self.seed)
+        self._last_scenario_date = self.start_time.date()
+        self._consumed_meal_times = set()
         self.scenario = self.create_scenario()
 
     @property
