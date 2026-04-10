@@ -37,6 +37,8 @@ class T1DSimEnv(gym.Env):
         sample_time=1.0,
         interaction_step=3.0,
         use_noise=False,
+        auto_bolus=False,
+        carbohydrate_ratio=None,
     ):
         """
         patient_name must be 'adolescent#001' to 'adolescent#010',
@@ -61,11 +63,14 @@ class T1DSimEnv(gym.Env):
         self.np_random, _ = seeding.np_random(seed=seed)
         self.custom_scenario = custom_scenario
         self.use_noise = use_noise
+        self.auto_bolus = bool(auto_bolus)
+        self.carbohydrate_ratio = carbohydrate_ratio
         self.env, _, _, _ = self._create_env()
 
     def _step(self, action: float):
         # This gym only controls basal insulin
-        act = Action(basal=action, bolus=0)
+        basal_action = float(np.asarray(action).reshape(-1)[0])
+        act = Action(basal=basal_action, bolus=0)
         if self.reward_fun is None:
             return self.env.step(act)
         return self.env.step(act, reward_fun=self.reward_fun)
@@ -103,12 +108,17 @@ class T1DSimEnv(gym.Env):
                 sample_time=self.sample_time,
             )
         else:
+            patient_name = self.patient_name
             patient = T1DPatient.withName(
                 self.patient_name,
                 random_init_bg=True,
                 seed=seed4,
                 sample_time=self.sample_time,
             )
+
+        carbohydrate_ratio = self.carbohydrate_ratio
+        if isinstance(carbohydrate_ratio, dict):
+            carbohydrate_ratio = carbohydrate_ratio.get(patient_name)
 
         if isinstance(self.custom_scenario, list):
             scenario = self.np_random.choice(self.custom_scenario)
@@ -127,7 +137,13 @@ class T1DSimEnv(gym.Env):
         )
         pump = InsulinPump.withName(self.INSULIN_PUMP_HARDWARE)
         env = _T1DSimEnv(
-            patient, sensor, pump, scenario, interaction_step=self.interaction_step
+            patient,
+            sensor,
+            pump,
+            scenario,
+            interaction_step=self.interaction_step,
+            auto_bolus=self.auto_bolus,
+            carbohydrate_ratio=carbohydrate_ratio,
         )
         return env, seed2, seed3, seed4
 

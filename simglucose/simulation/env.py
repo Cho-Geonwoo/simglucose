@@ -34,25 +34,78 @@ def risk_diff(BG_last_hour):
 
 
 class T1DSimEnv(object):
-    def __init__(self, patient, sensor, pump, scenario, interaction_step=3.0):
+    def __init__(
+        self,
+        patient,
+        sensor,
+        pump,
+        scenario,
+        interaction_step=3.0,
+        auto_bolus=False,
+        carbohydrate_ratio=None,
+    ):
         self.patient = patient
         self.sensor = sensor
         self.pump = pump
         self.scenario = scenario
         self.interaction_step = interaction_step
+        self.auto_bolus = bool(auto_bolus)
+        self.carbohydrate_ratio = carbohydrate_ratio
+
+        if self.auto_bolus:
+            if self.carbohydrate_ratio is None:
+                raise ValueError(
+                    "carbohydrate_ratio is required when auto_bolus is enabled"
+                )
+            if self.carbohydrate_ratio <= 0:
+                raise ValueError("carbohydrate_ratio must be positive")
+
         self._reset()
 
     @property
     def time(self):
         return self.scenario.start_time + timedelta(minutes=self.patient.t)
 
+    def _predict_consumed_cho(self, announced_cho):
+        pending_meal = self.patient.planned_meal + announced_cho
+        if pending_meal <= 0:
+            return 0.0
+
+        return float(
+            min(self.patient.EAT_RATE * self.patient.sample_time, pending_meal)
+        )
+
     def mini_step(self, action, update_observation=False):
         # current action
         patient_action = self.scenario.get_action(self.time)
+        announced_cho = float(patient_action.meal)
+        consumed_cho = self._predict_consumed_cho(announced_cho)
+
+        auto_bolus_input = 0.0
+        if self.auto_bolus:
+            # One-shot bolus at meal announce: add full meal/CR to pending pool.
+            if announced_cho > 0:
+                self._pending_bolus_units += announced_cho / self.carbohydrate_ratio
+
+            if self._pending_bolus_units > 0:
+                # Deliver as much as pump allows this step; carry remainder forward.
+                max_deliverable = (
+                    self.pump._params["max_bolus"] * self.patient.sample_time
+                )
+                deliver_units = min(self._pending_bolus_units, max_deliverable)
+                self._pending_bolus_units -= deliver_units
+                self._pending_bolus_units = max(0.0, self._pending_bolus_units)
+                # Convert from U (total this step) to U/min rate for simulator.
+                auto_bolus_input = deliver_units / self.patient.sample_time
+
+        manual_bolus_input = 0.0 if self.auto_bolus else float(action.bolus)
+        final_bolus_input = manual_bolus_input + auto_bolus_input
+
         basal = self.pump.basal(action.basal)
-        bolus = self.pump.bolus(action.bolus)
+        bolus = self.pump.bolus(final_bolus_input)
+        auto_bolus = self.pump.bolus(auto_bolus_input) if self.auto_bolus else 0.0
         insulin = basal + bolus
-        CHO = patient_action.meal
+        CHO = consumed_cho
         patient_mdl_act = Action(insulin=insulin, CHO=CHO)
 
         # State update
@@ -62,7 +115,7 @@ class T1DSimEnv(object):
         BG = self.patient.observation.Gsub
         CGM = self.sensor.measure(self.patient, update_observation=update_observation)
 
-        return CHO, insulin, BG, CGM
+        return CHO, insulin, BG, CGM, basal, bolus, auto_bolus, announced_cho
 
     def step(self, action, reward_fun=risk_diff):
         """
@@ -70,10 +123,18 @@ class T1DSimEnv(object):
         """
         total_cho = 0.0
         average_insulin = 0.0
+        average_basal = 0.0
+        average_bolus = 0.0
+        average_auto_bolus = 0.0
         average_bg = 0.0
         average_cgm = 0.0
+        total_announced_cho = 0.0
         cho_list = []
+        announced_cho_list = []
         insulin_list = []
+        basal_insulin_list = []
+        bolus_insulin_list = []
+        auto_bolus_insulin_list = []
         bg_list = []
         cgm_list = []
         lbgi_list = []
@@ -86,15 +147,30 @@ class T1DSimEnv(object):
             update_observation = False
             if i == int(self.interaction_step) - 1:
                 update_observation = True
-            tmp_CHO, tmp_insulin, tmp_BG, tmp_CGM = self.mini_step(
-                action, update_observation
-            )
+            (
+                tmp_CHO,
+                tmp_insulin,
+                tmp_BG,
+                tmp_CGM,
+                tmp_basal,
+                tmp_bolus,
+                tmp_auto_bolus,
+                tmp_announced_cho,
+            ) = self.mini_step(action, update_observation)
             total_cho += tmp_CHO
+            total_announced_cho += tmp_announced_cho
             average_insulin += tmp_insulin / self.interaction_step
+            average_basal += tmp_basal / self.interaction_step
+            average_bolus += tmp_bolus / self.interaction_step
+            average_auto_bolus += tmp_auto_bolus / self.interaction_step
             average_bg += tmp_BG / self.interaction_step
             average_cgm += tmp_CGM / self.interaction_step
             cho_list.append(tmp_CHO)
+            announced_cho_list.append(tmp_announced_cho)
             insulin_list.append(tmp_insulin)
+            basal_insulin_list.append(tmp_basal)
+            bolus_insulin_list.append(tmp_bolus)
+            auto_bolus_insulin_list.append(tmp_auto_bolus)
             bg_list.append(tmp_BG)
             cgm_list.append(tmp_CGM)
             datetime_list.append(self.time)
@@ -134,6 +210,7 @@ class T1DSimEnv(object):
             sample_time=self.sample_time,
             patient_name=self.patient.name,
             meal=total_cho,
+            announced_meal=total_announced_cho,
             patient_state=self.patient.state,
             time=self.time,
             bg=average_bg,
@@ -141,7 +218,14 @@ class T1DSimEnv(object):
             hbgi=HBGI,
             risk=risk,
             cho_list=cho_list,
+            announced_cho_list=announced_cho_list,
             insulin_list=insulin_list,
+            basal_insulin=average_basal,
+            bolus_insulin=average_bolus,
+            auto_bolus_insulin=average_auto_bolus,
+            basal_insulin_list=basal_insulin_list,
+            bolus_insulin_list=bolus_insulin_list,
+            auto_bolus_insulin_list=auto_bolus_insulin_list,
             bg_list=bg_list,
             cgm_list=cgm_list,
             lbgi_list=lbgi_list,
@@ -166,6 +250,7 @@ class T1DSimEnv(object):
         self.HBGI_hist = [HBGI]
         self.CHO_hist = []
         self.insulin_hist = []
+        self._pending_bolus_units = 0.0
 
     def reset(self):
         self.patient.reset()
@@ -182,6 +267,7 @@ class T1DSimEnv(object):
             sample_time=self.sample_time,
             patient_name=self.patient.name,
             meal=0,
+            announced_meal=0,
             patient_state=self.patient.state,
             time=self.time,
             bg=self.BG_hist[0],
@@ -189,7 +275,14 @@ class T1DSimEnv(object):
             hbgi=self.HBGI_hist[0],
             risk=self.risk_hist[0],
             cho_list=[],
+            announced_cho_list=[],
             insulin_list=[],
+            basal_insulin=0.0,
+            bolus_insulin=0.0,
+            auto_bolus_insulin=0.0,
+            basal_insulin_list=[],
+            bolus_insulin_list=[],
+            auto_bolus_insulin_list=[],
             bg_list=[],
             cgm_list=[],
             lbgi_list=[],
