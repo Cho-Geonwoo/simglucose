@@ -34,6 +34,9 @@ def risk_diff(BG_last_hour):
 
 
 class T1DSimEnv(object):
+    AUTO_BOLUS_WINDOW_MINUTES = 3.0
+    AUTO_BOLUS_MEAL_HISTORY_MINUTES = 180.0
+
     def __init__(
         self,
         patient,
@@ -43,6 +46,8 @@ class T1DSimEnv(object):
         interaction_step=3.0,
         auto_bolus=False,
         carbohydrate_ratio=None,
+        correction_factor=None,
+        target_blood_glucose=144.0,
     ):
         self.patient = patient
         self.sensor = sensor
@@ -51,6 +56,8 @@ class T1DSimEnv(object):
         self.interaction_step = interaction_step
         self.auto_bolus = bool(auto_bolus)
         self.carbohydrate_ratio = carbohydrate_ratio
+        self.correction_factor = correction_factor
+        self.target_blood_glucose = float(target_blood_glucose)
 
         if self.auto_bolus:
             if self.carbohydrate_ratio is None:
@@ -59,6 +66,8 @@ class T1DSimEnv(object):
                 )
             if self.carbohydrate_ratio <= 0:
                 raise ValueError("carbohydrate_ratio must be positive")
+            if self.correction_factor is not None and self.correction_factor <= 0:
+                raise ValueError("correction_factor must be positive when provided")
 
         self._reset()
 
@@ -66,50 +75,116 @@ class T1DSimEnv(object):
     def time(self):
         return self.scenario.start_time + timedelta(minutes=self.patient.t)
 
-    def _predict_consumed_cho(self, announced_cho):
-        pending_meal = self.patient.planned_meal + announced_cho
-        if pending_meal <= 0:
+    def _get_active_auto_bolus_input(self):
+        if (not self.auto_bolus) or (not self._auto_bolus_windows):
             return 0.0
 
-        return float(
-            min(self.patient.EAT_RATE * self.patient.sample_time, pending_meal)
+        sample_minutes = float(self.patient.sample_time)
+        total_input = 0.0
+        for window in self._auto_bolus_windows:
+            active_minutes = min(window["remaining_minutes"], sample_minutes)
+            if active_minutes > 0:
+                total_input += window["rate"] * (active_minutes / sample_minutes)
+        return total_input
+
+    def _has_recent_meal_history(self):
+        return any(window["meal"] > 0 for window in self._meal_history_windows)
+
+    def _get_auto_bolus_rate(self, meal):
+        bolus_units = float(meal) / self.carbohydrate_ratio
+
+        # Match the old offline-glucose helper: only apply the glucose
+        # correction term when there has not been a recent meal in history.
+        if (not self._has_recent_meal_history()) and self.correction_factor is not None:
+            current_glucose = float(self.CGM_hist[-1])
+            bolus_units += (
+                current_glucose - self.target_blood_glucose
+            ) / self.correction_factor
+
+        return bolus_units / self.AUTO_BOLUS_WINDOW_MINUTES
+
+    def _activate_pending_auto_bolus_window(self):
+        if (not self.auto_bolus) or self._pending_auto_bolus_meal <= 0:
+            return
+
+        rate = self._get_auto_bolus_rate(self._pending_auto_bolus_meal)
+        if abs(rate) <= 1e-9:
+            return
+
+        self._auto_bolus_windows.append(
+            {
+                "rate": rate,
+                "remaining_minutes": self.AUTO_BOLUS_WINDOW_MINUTES,
+            }
+        )
+
+    def _advance_auto_bolus_windows(self):
+        if (not self.auto_bolus) or (not self._auto_bolus_windows):
+            return
+
+        sample_minutes = float(self.patient.sample_time)
+        next_windows = []
+        for window in self._auto_bolus_windows:
+            remaining_minutes = window["remaining_minutes"] - sample_minutes
+            if remaining_minutes > 1e-9:
+                next_windows.append(
+                    {
+                        "rate": window["rate"],
+                        "remaining_minutes": remaining_minutes,
+                    }
+                )
+        self._auto_bolus_windows = next_windows
+
+    def _advance_meal_history_windows(self, elapsed_minutes):
+        if not self._meal_history_windows:
+            return
+
+        next_windows = []
+        for window in self._meal_history_windows:
+            remaining_minutes = window["remaining_minutes"] - elapsed_minutes
+            if remaining_minutes > 1e-9:
+                next_windows.append(
+                    {
+                        "meal": window["meal"],
+                        "remaining_minutes": remaining_minutes,
+                    }
+                )
+        self._meal_history_windows = next_windows
+
+    def _record_meal_history(self, meal):
+        if meal <= 0:
+            return
+
+        self._meal_history_windows.append(
+            {
+                "meal": float(meal),
+                "remaining_minutes": self.AUTO_BOLUS_MEAL_HISTORY_MINUTES,
+            }
         )
 
     def mini_step(self, action, update_observation=False):
         # current action
         patient_action = self.scenario.get_action(self.time)
         announced_cho = float(patient_action.meal)
-        consumed_cho = self._predict_consumed_cho(announced_cho)
+        auto_bolus_input = self._get_active_auto_bolus_input()
 
-        auto_bolus_input = 0.0
-        if self.auto_bolus:
-            # One-shot bolus at meal announce: add full meal/CR to pending pool.
-            if announced_cho > 0:
-                self._pending_bolus_units += announced_cho / self.carbohydrate_ratio
-
-            if self._pending_bolus_units > 0:
-                # Deliver as much as pump allows this step; carry remainder forward.
-                max_deliverable = (
-                    self.pump._params["max_bolus"] * self.patient.sample_time
-                )
-                deliver_units = min(self._pending_bolus_units, max_deliverable)
-                self._pending_bolus_units -= deliver_units
-                self._pending_bolus_units = max(0.0, self._pending_bolus_units)
-                # Convert from U (total this step) to U/min rate for simulator.
-                auto_bolus_input = deliver_units / self.patient.sample_time
+        basal_adjustment = min(auto_bolus_input, 0.0)
+        bolus_adjustment = max(auto_bolus_input, 0.0)
 
         manual_bolus_input = 0.0 if self.auto_bolus else float(action.bolus)
-        final_bolus_input = manual_bolus_input + auto_bolus_input
+        final_basal_input = float(action.basal) + basal_adjustment
+        final_bolus_input = manual_bolus_input + bolus_adjustment
 
-        basal = self.pump.basal(action.basal)
+        basal = self.pump.basal(final_basal_input)
         bolus = self.pump.bolus(final_bolus_input)
-        auto_bolus = self.pump.bolus(auto_bolus_input) if self.auto_bolus else 0.0
+        auto_bolus = self.pump.bolus(bolus_adjustment) if self.auto_bolus else 0.0
         insulin = basal + bolus
-        CHO = consumed_cho
+        CHO = announced_cho
         patient_mdl_act = Action(insulin=insulin, CHO=CHO)
 
         # State update
         self.patient.step(patient_mdl_act)
+        self._advance_auto_bolus_windows()
 
         # next observation
         BG = self.patient.observation.Gsub
@@ -121,6 +196,8 @@ class T1DSimEnv(object):
         """
         action is a namedtuple with keys: basal, bolus
         """
+        self._activate_pending_auto_bolus_window()
+
         total_cho = 0.0
         average_insulin = 0.0
         average_basal = 0.0
@@ -156,7 +233,7 @@ class T1DSimEnv(object):
                 tmp_bolus,
                 tmp_auto_bolus,
                 tmp_announced_cho,
-            ) = self.mini_step(action, update_observation)
+            ) = self.mini_step(action, update_observation=update_observation)
             total_cho += tmp_CHO
             total_announced_cho += tmp_announced_cho
             average_insulin += tmp_insulin / self.interaction_step
@@ -174,6 +251,11 @@ class T1DSimEnv(object):
             bg_list.append(tmp_BG)
             cgm_list.append(tmp_CGM)
             datetime_list.append(self.time)
+
+        step_minutes = float(self.patient.sample_time) * float(self.interaction_step)
+        self._advance_meal_history_windows(step_minutes)
+        self._record_meal_history(self._pending_auto_bolus_meal)
+        self._pending_auto_bolus_meal = total_cho
 
         # Compute risk index
         horizon = 1
@@ -250,7 +332,9 @@ class T1DSimEnv(object):
         self.HBGI_hist = [HBGI]
         self.CHO_hist = []
         self.insulin_hist = []
-        self._pending_bolus_units = 0.0
+        self._auto_bolus_windows = []
+        self._meal_history_windows = []
+        self._pending_auto_bolus_meal = 0.0
 
     def reset(self):
         self.patient.reset()

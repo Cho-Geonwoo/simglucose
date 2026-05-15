@@ -39,6 +39,8 @@ class T1DSimEnv(gym.Env):
         use_noise=False,
         auto_bolus=False,
         carbohydrate_ratio=None,
+        correction_factor=None,
+        target_blood_glucose=144.0,
     ):
         """
         patient_name must be 'adolescent#001' to 'adolescent#010',
@@ -65,6 +67,8 @@ class T1DSimEnv(gym.Env):
         self.use_noise = use_noise
         self.auto_bolus = bool(auto_bolus)
         self.carbohydrate_ratio = carbohydrate_ratio
+        self.correction_factor = correction_factor
+        self.target_blood_glucose = float(target_blood_glucose)
         self.env, _, _, _ = self._create_env()
 
     def _step(self, action: float):
@@ -120,6 +124,10 @@ class T1DSimEnv(gym.Env):
         if isinstance(carbohydrate_ratio, dict):
             carbohydrate_ratio = carbohydrate_ratio.get(patient_name)
 
+        correction_factor = self.correction_factor
+        if isinstance(correction_factor, dict):
+            correction_factor = correction_factor.get(patient_name)
+
         if isinstance(self.custom_scenario, list):
             scenario = self.np_random.choice(self.custom_scenario)
         else:
@@ -144,6 +152,8 @@ class T1DSimEnv(gym.Env):
             interaction_step=self.interaction_step,
             auto_bolus=self.auto_bolus,
             carbohydrate_ratio=carbohydrate_ratio,
+            correction_factor=correction_factor,
+            target_blood_glucose=self.target_blood_glucose,
         )
         return env, seed2, seed3, seed4
 
